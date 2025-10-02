@@ -29,3 +29,7 @@ func VerifyPasswordArgon2(password, hashed string) bool {
 	hash := argon2.IDKey([]byte(password), []byte(parts[1]), 1, 64*1024, 4, 32)
 	return base64.RawStdEncoding.EncodeToString(hash) == parts[0]
 }
+
+func IsValidEmail(s string) bool {
+	return strings.Count(s, "@") == 1 && len(s) >= 6 && strings.Contains(s, ".")
+}

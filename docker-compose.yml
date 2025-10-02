@@ -1,4 +1,4 @@
-version: '3.9'
+version: "3.9"
 
 services:
   postgres:
@@ -15,7 +15,7 @@ services:
       - POSTGRES_DB=currencydb
     networks:
       - appnet
-  
+
   backend:
     container_name: currency_converter_app
     build:
@@ -34,6 +34,14 @@ services:
       - DB_SSLMODE=disable
       - DB_TIMEZONE=Asia/Bangkok
       - JWT_SECRET=Wd15JdPhGkwaHx4RCWNxu0thiexfbI3O
+      - JWT_EXPIRY=24h
+      - EXCHANGE_API_URL=https://v6.exchangerate-api.com/v6/
+      - EXCHANGE_API_KEY=f1f7a18d707dad8dbd854c9d
+      - RATE_BASE_CURRENCY=USD
+      - RATE_REFRESH_INTERVAL=6h
+      - HTTP_CLIENT_TIMEOUT=10s
+      - RATE_LIMIT_REQUESTS=100
+      - RATE_LIMIT_WINDOW=1m
     depends_on:
       - postgres
     networks:

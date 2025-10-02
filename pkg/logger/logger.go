@@ -3,7 +3,6 @@ package logger
 import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	gormlogger "gorm.io/gorm/logger"
 )
 
 type Fields map[string]interface{}
@@ -77,32 +76,5 @@ func Level(lv string) zapcore.Level {
 		return zapcore.ErrorLevel
 	default:
 		return zapcore.InfoLevel
-	}
-}
-
-type GormZapLogger struct {
-	zapLogger *zap.SugaredLogger
-	level     gormlogger.LogLevel
-}
-
-func NewGormZapWriter(logger *zap.SugaredLogger, level gormlogger.LogLevel) gormlogger.Writer {
-	return &GormZapLogger{
-		zapLogger: logger,
-		level:     level,
-	}
-}
-
-func (g *GormZapLogger) Printf(format string, args ...interface{}) {
-	switch g.level {
-	case gormlogger.Info:
-		g.zapLogger.Infof(format, args...)
-	case gormlogger.Warn:
-		g.zapLogger.Warnf(format, args...)
-	case gormlogger.Error:
-		g.zapLogger.Errorf(format, args...)
-	case gormlogger.Silent:
-		// do nothing
-	default:
-		g.zapLogger.Infof(format, args...)
 	}
 }

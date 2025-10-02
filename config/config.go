@@ -21,6 +21,8 @@ type Config struct {
 	DBTimeZone          string
 	JWTSecret           string
 	JWTExpiry           time.Duration
+	ExchangeAPIURL      string
+	ExchangeAPIKey      string
 	RateBaseCurrency    string
 	RateRefreshInterval time.Duration
 	HTTPClientTimeout   time.Duration
@@ -44,6 +46,8 @@ func Load() Config {
 		JWTSecret:           mustEnv("JWT_SECRET"),
 		JWTExpiry:           getDuration("JWT_EXPIRY", 24*time.Hour),
 		RateBaseCurrency:    strings.ToUpper(getEnv("RATE_BASE_CURRENCY", "USD")),
+		ExchangeAPIURL:      getEnv("EXCHANGE_API_URL", "https://v6.exchangerate-api.com/v6/"),
+		ExchangeAPIKey:      getEnv("EXCHANGE_API_KEY", "f1f7a18d707dad8dbd854c9d"),
 		RateRefreshInterval: getDuration("RATE_REFRESH_INTERVAL", 6*time.Hour),
 		HTTPClientTimeout:   getDuration("HTTP_CLIENT_TIMEOUT", 10*time.Second),
 		RateLimitRequests:   getInt("RATE_LIMIT_REQUESTS", 100),

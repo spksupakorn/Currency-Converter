@@ -1,0 +1,216 @@
+basePath: /api/v1
+definitions:
+  controllers.loginReq:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  controllers.registerReq:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 8
+        type: string
+      username:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  response.ErrorResponse:
+    properties:
+      code:
+        type: string
+      details: {}
+      message:
+        type: string
+      trace_id: {}
+    type: object
+host: localhost:8080
+info:
+  contact:
+    name: API Support
+    url: http://swagger.io/contact/
+  description: server for a currency converter application.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: Currency Converter API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Login a user with email and password
+      parameters:
+      - description: Login Request
+        in: body
+        name: loginReq
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.loginReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Login a user
+      tags:
+      - Authentication
+  /auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Logout a user by invalidating their token
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Logout a user
+      tags:
+      - Authentication
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user with email and password
+      parameters:
+      - description: Register Request
+        in: body
+        name: registerReq
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.registerReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Register a new user
+      tags:
+      - Authentication
+  /convert:
+    get:
+      consumes:
+      - application/json
+      description: Convert an amount from one currency to another using the latest
+        exchange rates.
+      parameters:
+      - description: Source currency (3-letter code, e.g., USD)
+        in: query
+        name: from
+        required: true
+        type: string
+      - description: Target currency (3-letter code, e.g., THB)
+        in: query
+        name: to
+        required: true
+        type: string
+      - description: Amount to convert (non-negative)
+        in: query
+        name: amount
+        required: true
+        type: number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Convert Currency
+      tags:
+      - Rates
+  /rates:
+    get:
+      consumes:
+      - application/json
+      description: Get all exchange rates relative to a specified base currency. If
+        no base is provided, defaults to USD.
+      parameters:
+      - description: Base currency (3-letter code, e.g., USD)
+        in: query
+        name: base
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get Exchange Rates
+      tags:
+      - Rates
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer {token}" to authenticate.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

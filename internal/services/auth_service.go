@@ -1,202 +1,121 @@
 package services
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"net/http"
 	"strings"
-	"sync"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/spksupakorn/Currency-Converter/config"
-	"github.com/spksupakorn/Currency-Converter/pkg/logger"
-
+	"github.com/spksupakorn/Currency-Converter/internal/models"
 	"github.com/spksupakorn/Currency-Converter/internal/repositories"
+	"github.com/spksupakorn/Currency-Converter/pkg/logger"
+	"github.com/spksupakorn/Currency-Converter/pkg/utils"
 )
 
-type RateService interface {
-	StartBackgroundRefresh(ctx context.Context)
-	GetRates(base string) (baseOut string, rates map[string]float64, updatedAt time.Time, err error)
-	Convert(from, to string, amount float64) (rate float64, result float64, updatedAt time.Time, err error)
+type AuthService interface {
+	Register(username string, email, password string) error
+	Login(email, password string) (string, *models.User, error)
+	Logout(userID uint) error
+	ParseToken(token string) (*jwt.Token, *TokenClaims, error)
 }
 
-type rateService struct {
-	cfg    config.Config
-	repo   repositories.RateRepository
-	log    *logger.Logger
-	client *http.Client
-
-	mu         sync.RWMutex
-	cacheBase  string
-	cacheRates map[string]float64
-	cacheAt    time.Time
+type authService struct {
+	cfg      config.Config
+	userRepo repositories.UserRepository
+	log      *logger.Logger
 }
 
-func NewRateService(cfg config.Config, repo repositories.RateRepository, log *logger.Logger) RateService {
-	return &rateService{
-		cfg:    cfg,
-		repo:   repo,
-		log:    log,
-		client: &http.Client{Timeout: cfg.HTTPClientTimeout},
+type TokenClaims struct {
+	UserID       uint   `json:"uid"`
+	Email        string `json:"email"`
+	TokenVersion int    `json:"ver"`
+	jwt.RegisteredClaims
+}
+
+func NewAuthService(cfg config.Config, userRepo repositories.UserRepository, log *logger.Logger) AuthService {
+	return &authService{cfg: cfg, userRepo: userRepo, log: log}
+}
+
+func (s *authService) Register(username, email, password string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" || password == "" {
+		return errors.New("email and password are required")
 	}
-}
-
-func (s *rateService) StartBackgroundRefresh(ctx context.Context) {
-	// Initial load
-	go func() {
-		if err := s.refresh(ctx); err != nil {
-			s.log.Error("initial rate refresh failed", logger.Fields{"error": err.Error()})
-		}
-	}()
-
-	ticker := time.NewTicker(s.cfg.RateRefreshInterval)
-	go func() {
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				if err := s.refresh(ctx); err != nil {
-					s.log.Error("rate refresh failed", logger.Fields{"error": err.Error()})
-				}
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-}
-
-func (s *rateService) refresh(ctx context.Context) error {
-	base := s.cfg.RateBaseCurrency
-	base = strings.ToUpper(strings.TrimSpace(base))
-	if base == "" {
-		base = "USD"
+	if len(password) < 8 {
+		return errors.New("password must be at least 8 characters")
+	}
+	if !utils.IsValidEmail(email) {
+		return errors.New("invalid email format")
+	}
+	_, err := s.userRepo.FindByEmail(email)
+	if err == nil {
+		return errors.New("email already registered")
 	}
 
-	url := fmt.Sprintf("https://api.exchangerate.host/latest?base=%s", base)
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	resp, err := s.client.Do(req)
+	salt, err := utils.GenerateSalt(16)
 	if err != nil {
-		return err
+		return errors.New("failed to generate salt")
 	}
-	defer resp.Body.Close()
+	hash := utils.HashPasswordArgon2(password, salt)
 
-	if resp.StatusCode >= 300 {
-		return fmt.Errorf("rates api error: %s", resp.Status)
+	u := &models.User{
+		Username:     username,
+		Email:        email,
+		Password:     string(hash),
+		TokenVersion: 0,
 	}
-
-	var out struct {
-		Base  string             `json:"base"`
-		Rates map[string]float64 `json:"rates"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return err
-	}
-
-	// Ensure base has rate 1.0 in the map
-	if out.Rates == nil {
-		out.Rates = map[string]float64{}
-	}
-	out.Rates[out.Base] = 1.0
-
-	now := time.Now().UTC()
-	if err := s.repo.UpsertRates(out.Rates, now); err != nil {
-		return err
-	}
-
-	s.mu.Lock()
-	s.cacheBase = out.Base
-	s.cacheRates = out.Rates
-	s.cacheAt = now
-	s.mu.Unlock()
-
-	s.log.Info("rates refreshed", logger.Fields{"base": out.Base, "count": len(out.Rates)})
-	return nil
+	return s.userRepo.Create(u)
 }
 
-func (s *rateService) GetRates(base string) (string, map[string]float64, time.Time, error) {
-	base = normalizeCurrency(base)
-	s.mu.RLock()
-	rates := s.cacheRates
-	cacheBase := s.cacheBase
-	cacheAt := s.cacheAt
-	s.mu.RUnlock()
-
-	if len(rates) == 0 {
-		// Fallback to DB
-		dbRates, updatedAt, err := s.repo.GetAllRates()
-		if err != nil || len(dbRates) == 0 {
-			return "", nil, time.Time{}, errors.New("rates are not available yet")
-		}
-		rates = dbRates
-		cacheBase = s.cfg.RateBaseCurrency
-		cacheAt = updatedAt
+func (s *authService) Login(email, password string) (string, *models.User, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	u, err := s.userRepo.FindByEmail(email)
+	if err != nil {
+		return "", nil, errors.New("invalid email or password")
+	}
+	if !utils.VerifyPasswordArgon2(password, u.Password) {
+		return "", nil, errors.New("invalid email or password")
+	}
+	//*Invalidate previous sessions by incrementing token version
+	if err := s.userRepo.IncrementTokenVersion(u.ID); err != nil {
+		return "", nil, err
+	}
+	//*Reload user to get new token version
+	u, err = s.userRepo.FindByID(u.ID)
+	if err != nil {
+		return "", nil, err
 	}
 
-	// If requested base equals cache base, return as-is
-	if base == "" || base == cacheBase {
-		// Copy to avoid mutation
-		out := make(map[string]float64, len(rates))
-		for k, v := range rates {
-			out[k] = v
-		}
-		out[cacheBase] = 1.0
-		return cacheBase, out, cacheAt, nil
+	claims := TokenClaims{
+		UserID:       u.ID,
+		Email:        u.Email,
+		TokenVersion: u.TokenVersion,
+		RegisteredClaims: jwt.RegisteredClaims{
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.cfg.JWTExpiry)),
+		},
 	}
-
-	// Derive rates for requested base: rate(base->X) = rate(cacheBase->X) / rate(cacheBase->base)
-	baseRate, ok := rates[base]
-	if !ok || baseRate == 0 {
-		return "", nil, time.Time{}, fmt.Errorf("unsupported base currency: %s", base)
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	ss, err := tok.SignedString([]byte(s.cfg.JWTSecret))
+	if err != nil {
+		return "", nil, err
 	}
-	out := make(map[string]float64, len(rates))
-	for cur, r := range rates {
-		out[cur] = r / baseRate
-	}
-	out[base] = 1.0
-	return base, out, cacheAt, nil
+	return ss, u, nil
 }
 
-func (s *rateService) Convert(from, to string, amount float64) (float64, float64, time.Time, error) {
-	from = normalizeCurrency(from)
-	to = normalizeCurrency(to)
-	if from == "" || to == "" {
-		return 0, 0, time.Time{}, errors.New("from and to currencies are required")
-	}
-	if amount < 0 {
-		return 0, 0, time.Time{}, errors.New("amount must be non-negative")
-	}
-
-	s.mu.RLock()
-	rates := s.cacheRates
-	cacheAt := s.cacheAt
-	s.mu.RUnlock()
-
-	if len(rates) == 0 {
-		dbRates, updatedAt, err := s.repo.GetAllRates()
-		if err != nil || len(dbRates) == 0 {
-			return 0, 0, time.Time{}, errors.New("exchange rates are not available")
-		}
-		rates = dbRates
-		cacheAt = updatedAt
-	}
-
-	// Convert via cacheBase: rate(from->to) = (rate(cacheBase->to) / rate(cacheBase->from))
-	rFrom, okFrom := rates[from]
-	rTo, okTo := rates[to]
-	if !okFrom || rFrom == 0 {
-		return 0, 0, time.Time{}, fmt.Errorf("unsupported currency: %s", from)
-	}
-	if !okTo {
-		return 0, 0, time.Time{}, fmt.Errorf("unsupported currency: %s", to)
-	}
-
-	rate := rTo / rFrom
-	result := amount * rate
-	return rate, result, cacheAt, nil
+func (s *authService) Logout(userID uint) error {
+	return s.userRepo.IncrementTokenVersion(userID)
 }
 
-func normalizeCurrency(s string) string {
-	return strings.ToUpper(strings.TrimSpace(s))
+func (s *authService) ParseToken(token string) (*jwt.Token, *TokenClaims, error) {
+	claims := &TokenClaims{}
+	tok, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (interface{}, error) {
+		return []byte(s.cfg.JWTSecret), nil
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Name}))
+
+	if err != nil || !tok.Valid {
+		return nil, nil, errors.New("invalid token")
+	}
+	return tok, claims, nil
 }

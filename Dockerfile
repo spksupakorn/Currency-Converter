@@ -11,7 +11,6 @@ RUN go mod download
 
 COPY . ./
 
-RUN go build -v -o migration ./database/migrations
 RUN go build -v -o backend ./cmd/app
 
 FROM alpine:latest
@@ -23,10 +22,7 @@ RUN apk add --no-cache ca-certificates tzdata \
     && echo "Asia/Bangkok" > /etc/timezone
 
 COPY --from=builder /app/backend /app/backend
-COPY --from=builder /app/migration /app/migration
-COPY --from=builder /app/uploads /app/uploads
 
 EXPOSE 8080
 
-# Run migration and start the server
-CMD ["/bin/sh", "-c", "./migration && ./backend"]
+CMD ["/bin/sh", "-c", "./backend"]

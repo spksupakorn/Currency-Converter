@@ -1,0 +1,239 @@
+{
+	"info": {
+		"_postman_id": "984549fe-ef92-4db9-9155-838ff74c2835",
+		"name": "currency converter",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "26064963",
+		"_collection_link": "https://www.postman.com/universal-desert-966149/workspace/currency-converter-doc/collection/26064963-984549fe-ef92-4db9-9155-838ff74c2835?action=share&source=collection_link&creator=26064963"
+	},
+	"item": [
+		{
+			"name": "login",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"try {",
+							"    var jsonData = pm.response.json();",
+							"    console.log(\"JSON data:\", jsonData);",
+							"    if (jsonData.access_token) {",
+							"        pm.environment.set(\"TOKEN\", jsonData.access_token);",
+							"        console.log(\"Token set:\", jsonData.access_token);",
+							"    } else {",
+							"        console.log(\"access_token not found in response\");",
+							"    }",
+							"} catch (e) {",
+							"    console.log(\"Error parsing JSON:\", e);",
+							"}"
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "accept",
+						"value": "application/json"
+					},
+					{
+						"key": "content-type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"email\": \"user@example.com\",\n    \"password\": \"SuperSecret123\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{BASEURL}}/api/v1/auth/login",
+					"host": [
+						"{{BASEURL}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"login"
+					]
+				},
+				"description": "Generated from cURL: curl -X POST \"http://localhost:8080/api/v1/auth/login\" \\\n -H 'accept: application/json'\\\n -H 'content-type: application/json' \\\n -d '{\"email\":\"ball2one@hotmail.com\",\"password\":\"password1234\"}' "
+			},
+			"response": []
+		},
+		{
+			"name": "get rates",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{TOKEN}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "accept",
+						"value": "application/json"
+					},
+					{
+						"key": "authorization",
+						"value": "{{vault:json-web-token}}"
+					}
+				],
+				"url": {
+					"raw": "{{BASEURL}}/api/v1/rates?base=USD",
+					"host": [
+						"{{BASEURL}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"rates"
+					],
+					"query": [
+						{
+							"key": "base",
+							"value": "USD"
+						}
+					]
+				},
+				"description": "Generated from cURL: curl -X GET \"http://localhost:8080/api/v1/rates\" \\\n -H 'accept: application/json'\\\n -H 'authorization: {{vault:json-web-token}}' "
+			},
+			"response": []
+		},
+		{
+			"name": "register",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"email\": \"user@example.com\",\n    \"password\": \"SuperSecret123\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{BASEURL}}/api/v1/auth/register",
+					"host": [
+						"{{BASEURL}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"register"
+					]
+				},
+				"description": "Generated from cURL: curl -X POST http://localhost:8080/api/v1/auth/register \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"email\":\"user@example.com\",\"password\":\"SuperSecret123\"}'"
+			},
+			"response": []
+		},
+		{
+			"name": "convert",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{TOKEN}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer $TOKEN"
+					}
+				],
+				"url": {
+					"raw": "{{BASEURL}}/api/v1/convert?from=USD&to=THB&amount=10",
+					"host": [
+						"{{BASEURL}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"convert"
+					],
+					"query": [
+						{
+							"key": "from",
+							"value": "USD"
+						},
+						{
+							"key": "to",
+							"value": "THB"
+						},
+						{
+							"key": "amount",
+							"value": "10"
+						}
+					]
+				},
+				"description": "Generated from cURL: curl -H \"Authorization: Bearer $TOKEN\" \\\n  \"http://localhost:8080/api/v1/convert?from=USD&to=THB&amount=10\""
+			},
+			"response": []
+		},
+		{
+			"name": "logout",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{TOKEN}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer $TOKEN"
+					}
+				],
+				"url": {
+					"raw": "{{BASEURL}}/api/v1/auth/logout",
+					"host": [
+						"{{BASEURL}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"logout"
+					]
+				},
+				"description": "Generated from cURL: curl -X POST -H \"Authorization: Bearer $TOKEN\" http://localhost:8080/api/v1/auth/logout"
+			},
+			"response": []
+		}
+	]
+}

@@ -1,0 +1,46 @@
+version: '3.9'
+
+services:
+  postgres:
+    container_name: postgres_db
+    image: postgres:16-alpine
+    restart: always
+    ports:
+      - 5432:5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=S3cret
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=currencydb
+    networks:
+      - appnet
+  
+  backend:
+    container_name: currency_converter_app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - 8080:8080
+    environment:
+      - PORT=8080
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=S3cret
+      - DB_NAME=currencydb
+      - DB_SSLMODE=disable
+      - DB_TIMEZONE=Asia/Bangkok
+      - JWT_SECRET=Wd15JdPhGkwaHx4RCWNxu0thiexfbI3O
+    depends_on:
+      - postgres
+    networks:
+      - appnet
+
+volumes:
+  pgdata:
+
+networks:
+  appnet:
